@@ -37,14 +37,14 @@ def analyze_general_documents(projectname,documentname):
     #result = poller.result()
     
     #analyze document from local file
-    with open("projects/"+projectname+'/files/'+documentname, "rb") as f:
+    with open(projectname+'/files/'+documentname, "rb") as f:
         print("Analyzing document...")
         poller = document_analysis_client.begin_analyze_document("prebuilt-document", f)
         result = poller.result()
     
     analyze_result_dict = result.to_dict()
     #write results to json file
-    jsonfile = "projects/"+projectname+'/files/'+documentname+'.json'
+    jsonfile = projectname+'/files/'+documentname+'.json'
     with open(jsonfile, 'w', encoding='utf-8') as f:
         print("Writing results to json file...")
         json.dump(analyze_result_dict, f, cls=AzureJSONEncoder, ensure_ascii=False, indent=4)

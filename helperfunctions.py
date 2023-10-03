@@ -27,25 +27,25 @@ def resetpage():
 # refresh vector index list from directory names in faiss folder
 def refresh_topic_list():
     directory_list = list()
-    for root, dirs, files in os.walk("projects/"+st.session_state.project+"/topics/", topdown=False):
+    for root, dirs, files in os.walk(st.session_state.project+"/topics/", topdown=False):
         for name in dirs:
             directory_list.append(os.path.join(name))
     st.session_state.topic_list = directory_list
 
 def add_topic(topicname):
     print('adding topic to '+st.session_state.project)
-    if os.path.isdir("projects/"+st.session_state.project+"/topics/"+topicname):
+    if os.path.isdir(st.session_state.project+"/topics/"+topicname):
         st.error("Topic already exists")
     else:
-        os.mkdir("projects/"+st.session_state.project+"/topics/"+topicname)
+        os.mkdir(st.session_state.project+"/topics/"+topicname)
         #write questions.txt to dir
-        with open("projects/"+st.session_state.project+"/topics/"+topicname+"/questions.txt", "w") as f:
+        with open(st.session_state.project+"/topics/"+topicname+"/questions.txt", "w") as f:
             pass
         #write queries.txt to dir
-        with open("projects/"+st.session_state.project+"/topics/"+topicname+"/queries.txt", "w") as f:
+        with open(st.session_state.project+"/topics/"+topicname+"/queries.txt", "w") as f:
             pass
         #write ground_truth.txt to dir
-        with open("projects/"+st.session_state.project+"/topics/"+topicname+"/ground_truth.txt", "w") as f:
+        with open(st.session_state.project+"/topics/"+topicname+"/ground_truth.txt", "w") as f:
             pass
     refresh_topic_list()
     st.session_state.topic=topicname
@@ -53,9 +53,9 @@ def add_topic(topicname):
 
 
 def delete_topic(topicname):
-    if os.path.isdir("projects/"+st.session_state.project+"/topics/"+topicname):
+    if os.path.isdir(st.session_state.project+"/topics/"+topicname):
         #delete directory
-       shutil.rmtree("projects/"+st.session_state.project+"/topics/"+topicname, ignore_errors=True)
+       shutil.rmtree(st.session_state.project+"/topics/"+topicname, ignore_errors=True)
     refresh_topic_list()
     if(len(st.session_state.topic_list)>0):
         st.session_state.topic=st.session_state.topic_list[0]
@@ -73,7 +73,7 @@ def refresh_project_list():
         st.session_state.project=dirs[0]
 
 def add_project(projectname):
-    if os.path.isdir("projects/"+projectname):
+    if os.path.isdir(projectname):
         st.error("project already exists")
     else:
         os.mkdir("projects/"+projectname)
@@ -100,7 +100,7 @@ def delete_project(projectname):
 # refresh vector index list from directory names in faiss folder
 def refresh_vector_index_list(): 
     directory_list = list()
-    for root, dirs, files in os.walk("projects/"+st.session_state.project+"/faiss/", topdown=False):
+    for root, dirs, files in os.walk(st.session_state.project+"/faiss/", topdown=False):
         for name in dirs:
             directory_list.append(os.path.join(name))
     st.session_state.vector_index_list = directory_list
@@ -150,14 +150,50 @@ def recognize_from_microphone(target):
             print("Did you set the speech resource key and region values?")
 
 def askquestion():
-    if 'context' not in st.session_state:
-        st.warning('No Context is used. Please use query first')
-    else:
-        if 'vs' in st.session_state: # if there's the vector store (user uploaded, split and embedded a file)
-            #replace â‚¬ with € in the answer
-            st.session_state.answer=ftfy.fix_encoding(askwithcontext(st.session_state.question))
+    vector_store = st.session_state.vs
+    pagecontent=st.session_state.pagecontent
+    k=st.session_state.k
+    # from langchain.embeddings.openai import OpenAIEmbeddings
+    # embeddings = OpenAIEmbeddings(deployment="text-embedding-ada-002", chunk_size=16)
+
+    pagechecker=[]
+
+    print("Query: ",st.session_state.question)   
+    print(vector_store) 
+    result= vector_store.similarity_search_with_score(query=st.session_state.question, k=k)
+    pages=[]
+    context=""
+    querycontent=[]
+    queryscores=[]
+    querypages=[]
+    for r in result:
+        querycontent.append(r[0].page_content)
+        queryscores.append(r[1])
+        querypages.append(str(",".join(str(x) for x in r[0].metadata['pages'])))
+        for pagenr in r[0].metadata['pages']:
+            if pagenr not in pages:
+                pages.append(pagenr)
+    sortedpages=pages.copy()
+    sortedpages.sort()
+    
+    for p in sortedpages:
+        currenttokens=gettokens(context)
+        if gettokens(context+pagecontent[str(p)])<=3500:
+            context+=pagecontent[str(p)]
         else:
-            st.error('Please select a Document first')
+            st.info("Warning !!! Skipping page "+str(p)+" as context is already "+str(currenttokens))
+            print("Warning !!! Skipping page "+str(p)+" as context is already "+str(currenttokens))
+
+    st.session_state.context=context
+    st.session_state.sourcepages=pages
+    st.session_state.querycontent=querycontent
+    st.session_state.queryscores=queryscores
+    st.session_state.querypages=querypages
+    if 'vs' in st.session_state: # if there's the vector store (user uploaded, split and embedded a file)
+        #replace â‚¬ with € in the answer
+        st.session_state.answer=ftfy.fix_encoding(askwithcontext(st.session_state.question))
+    else:
+        st.error('Please select a Document first')
 
 
 def gettokens(text):
@@ -192,20 +228,20 @@ def synthesize_text(text):
 
 def load_embeddings():
     embeddings = OpenAIEmbeddings(deployment="text-embedding-ada-002", chunk_size=16)
-    st.session_state.vs = FAISS.load_local("projects/"+st.session_state.project+"/faiss/"+st.session_state.vector_index_name, embeddings)
+    st.session_state.vs = FAISS.load_local(st.session_state.project+"/faiss/"+st.session_state.vector_index_name, embeddings)
     st.session_state.document_name = st.session_state.vector_index_name
     st.success(st.session_state.vector_index_name+' loaded successfully.')
-    contentjsonfile="projects/"+st.session_state.project+"/files/"+st.session_state.vector_index_name+".pagecontent.json"
+    contentjsonfile=st.session_state.project+"/files/"+st.session_state.vector_index_name+".pagecontent.json"
     with open(contentjsonfile, encoding='utf-8') as json_file:
         st.session_state.pagecontent = json.load(json_file)
     #st.success('Pagecontent '+ st.session_state.vector_index_name+' loaded successfully.')
-    tablemdfile="projects/"+st.session_state.project+"/files/"+st.session_state.vector_index_name+".tables.md"
+    tablemdfile=st.session_state.project+"/files/"+st.session_state.vector_index_name+".tables.md"
     with open(tablemdfile, encoding='utf-8') as table_file:
             st.session_state.tables = table_file.read()
-    fullmdfile="projects/"+st.session_state.project+"/files/"+st.session_state.vector_index_name+".md"
+    fullmdfile=st.session_state.project+"/files/"+st.session_state.vector_index_name+".md"
     with open(fullmdfile, encoding='utf-8') as fullmd_file:
         st.session_state.fullmd = fullmd_file.read()   
-    keyvaluesjsonfile="projects/"+st.session_state.project+"/files/"+st.session_state.vector_index_name+".keyvalues.json"
+    keyvaluesjsonfile=st.session_state.project+"/files/"+st.session_state.vector_index_name+".keyvalues.json"
     with open(keyvaluesjsonfile, encoding='utf-8') as json_file:
         st.session_state.keyvalues = json.load(json_file)
     #st.success('Tables from '+ st.session_state.vector_index_name+' loaded successfully.')
@@ -214,7 +250,7 @@ def load_embeddings():
 
 def getgroundtruthpages():
     groundtruthpages = []
-    with open("projects/"+st.session_state.project+'/topics/'+st.session_state.topic+'/ground_truth.txt') as f:
+    with open(st.session_state.project+'/topics/'+st.session_state.topic+'/ground_truth.txt') as f:
         for line in f:
             if line.split(";")[0] == st.session_state.vector_index_name:
                 groundtruthpages=line.split(";")[1].split(",")
@@ -226,11 +262,11 @@ def getgroundtruthpages():
 
 def setgroundtruthpages():
     newgroundtruthpages = st.session_state.ground_truth
-    with open("projects/"+st.session_state.project+'/topics/'+st.session_state.topic+'/ground_truth.txt','r') as f:
+    with open(st.session_state.project+'/topics/'+st.session_state.topic+'/ground_truth.txt','r') as f:
         lines = f.readlines()
 
     addline=True
-    with open("projects/"+st.session_state.project+'/topics/'+st.session_state.topic+'/ground_truth.txt','w') as f:
+    with open(st.session_state.project+'/topics/'+st.session_state.topic+'/ground_truth.txt','w') as f:
         for line in lines:
             if line.split(";")[0] == st.session_state.vector_index_name:
                 addline=False
@@ -239,7 +275,7 @@ def setgroundtruthpages():
             else:
                 f.write(line)
     if addline:
-        with open("projects/"+st.session_state.project+'/topics/'+st.session_state.topic+'/ground_truth.txt','a') as f:
+        with open(st.session_state.project+'/topics/'+st.session_state.topic+'/ground_truth.txt','a') as f:
             f.write(st.session_state.vector_index_name+";"+newgroundtruthpages+"\n")
     
 
@@ -251,13 +287,14 @@ def getcontext():
         groundtruthpages=getgroundtruthpages()
         pagecontent=st.session_state.pagecontent
         k=st.session_state.k
-        from langchain.embeddings.openai import OpenAIEmbeddings
-        embeddings = OpenAIEmbeddings(deployment="text-embedding-ada-002", chunk_size=16)
+        # from langchain.embeddings.openai import OpenAIEmbeddings
+        # embeddings = OpenAIEmbeddings(deployment="text-embedding-ada-002", chunk_size=16)
 
         pagechecker=[]
 
-        print("Query: ",query)    
-        result= vector_store.similarity_search_with_score(query=query, k=k, embeddings=embeddings, return_metadata=True)
+        print("Query: ",query)   
+        print(vector_store) 
+        result= vector_store.similarity_search_with_score(query=query, k=k)
         pages=[]
         context=""
         querycontent=[]
@@ -355,10 +392,10 @@ def askwithcontext(question):
 
 def delete_query():
     queryname=st.session_state.query
-    with open("projects/"+st.session_state.project+'/topics/'+st.session_state.topic+'/queries.txt', 'r') as f:
+    with open(st.session_state.project+'/topics/'+st.session_state.topic+'/queries.txt', 'r') as f:
         lines = f.readlines()
 
-    with open("projects/"+st.session_state.project+'/topics/'+st.session_state.topic+'/queries.txt', 'w') as f:
+    with open(st.session_state.project+'/topics/'+st.session_state.topic+'/queries.txt', 'w') as f:
         for line in lines:
             if line.strip("\n") != queryname:
                 f.write(line)
@@ -370,7 +407,7 @@ def delete_query():
                                 
 def add_query(queryname):
     #add query to end of queries.txt
-    with open("projects/"+st.session_state.project+'/topics/'+st.session_state.topic+'/queries.txt', 'a') as f:
+    with open(st.session_state.project+'/topics/'+st.session_state.topic+'/queries.txt', 'a') as f:
         f.write(queryname+"\n")
     load_topic(False)
 
@@ -391,7 +428,7 @@ def delete_question():
                                 
 def add_question(questionname):
     #add question to end of questions.txt
-    with open("projects/"+st.session_state.project+'/topics/'+st.session_state.topic+'/questions.txt', 'a') as f:
+    with open(st.session_state.project+'/topics/'+st.session_state.topic+'/questions.txt', 'a') as f:
         f.write(questionname+"\n")
     load_topic(False)
 
@@ -404,13 +441,13 @@ def load_topic(reset=True):
             del st.session_state.answer
     #open queries text and add all lines to a list
     query_list = []
-    with open("projects/"+st.session_state.project+'/topics/'+st.session_state.topic+'/queries.txt') as f:
+    with open(st.session_state.project+'/topics/'+st.session_state.topic+'/queries.txt') as f:
         for line in f:
             query_list.append(line.strip())
     st.session_state.query_list = query_list
     #open questions text and add all lines to a list
     question_list = []
-    with open("projects/"+st.session_state.project+'/topics/'+st.session_state.topic+'/questions.txt') as f:
+    with open(st.session_state.project+'/topics/'+st.session_state.topic+'/questions.txt') as f:
         for line in f:
             question_list.append(line.strip())
     st.session_state.question_list = question_list

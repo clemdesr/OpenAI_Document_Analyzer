@@ -7,6 +7,7 @@ import json
 import os
 from langchain.docstore.document import Document
 from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.embeddings import HuggingFaceEmbeddings, SentenceTransformerEmbeddings
 from langchain.vectorstores import FAISS
 import tablehelper as tb
 
@@ -219,7 +220,7 @@ def createdocs(jsondata,maxtokensize,sourcename):
 def create_embeddings(projectname,chunks,sourcename):
     embeddings = OpenAIEmbeddings(deployment="text-embedding-ada-002", chunk_size=16)
     vector_store = FAISS.from_documents(chunks, embeddings)
-    vector_store.save_local("projects/"+projectname+'/faiss/'+sourcename+'.json')
+    vector_store.save_local(projectname+'/faiss/'+sourcename+'.json')
     #vector_store = Chroma.from_documents(chunks, embeddings)
     return vector_store
 
