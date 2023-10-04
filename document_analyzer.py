@@ -8,6 +8,7 @@ streamlit run ./document_analyter.demo.py
 
 '''
 import os
+import base64
 import streamlit as st
 # loading the OpenAI api key from .env
 from dotenv import load_dotenv, find_dotenv
@@ -171,23 +172,28 @@ if st.session_state.vector_index_name != None:
 
         #Tab 1: Document Viewer
         with tab1:
-            col1, col2,col3,col4,col5,col6 = st.columns([1.8,0.8,1.1,1.1,1,1])    
+            file_path = os.path.join(st.session_state.project+'/files/', st.session_state.vector_index_name.replace(".json", ""))
+            with open(file_path, "rb") as f:
+                base64_pdf = base64.b64encode(f.read()).decode("utf-8")
+                pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width = "100%" height=600 type="application/pdf"></iframe>'
+            f.close()
+            col1, col2,col4,col5,col6 = st.columns([1.8,1,1,1,1])    
             with col1:
                 col21, col22 = st.columns([1,1])
                 with col21:
                     startpage=st.number_input('Start Page',min_value=1, max_value=1000,key="startpage")
                 with col22:
                     endpage=st.number_input('End Page',min_value=1, max_value=1000,key="endpage")
-            with col2:
-                show=st.button('Show Pages')
-            with col3:
-                fulldocument=st.button('Full document',on_click=resetpage)     
             with col4:
+                show=st.button('Parsed text')
+            # with col3:
+            #     fulldocument=st.button('Full document',on_click=resetpage)     
+            with col2:
                 rawdocument=st.button('Raw document',on_click=resetpage)        
             with col5:
-                tables=st.button('Show tables')
+                tables=st.button('Parsed tables')
             with col6:
-                keyvalues=st.button('Show Key Values')
+                keyvalues=st.button('Parsed Key Values')
             if tables:
                 with st.expander("Tables",expanded=True):
                     if 'tables' in st.session_state:
@@ -197,25 +203,30 @@ if st.session_state.vector_index_name != None:
                     if 'keyvalues' in st.session_state:
                         st.json(st.session_state.keyvalues)
             if rawdocument:
-                pass
-            if show or fulldocument:
-                if fulldocument:
-                    startpage=1
-                    endpage=len(st.session_state.pagecontent)
-                for i in range(startpage,endpage):
-                    if i==1:
-                        st.markdown('***Begin of Document***')
-                    st.markdown(ftfy.fix_encoding(st.session_state.pagecontent[str(i)]))
-                    st.markdown('***Page '+str(i)+' of '+str(len(st.session_state.pagecontent))+'***')
-                    if i==len(st.session_state.pagecontent)-1:
-                        st.markdown('***End of Document***')
-                if startpage==endpage:
-                    if startpage==1:
-                        st.markdown('***Begin of Document***')
-                    st.markdown(ftfy.fix_encoding(st.session_state.pagecontent[str(startpage)]))
-                    st.markdown('***Page '+str(startpage)+' of '+str(len(st.session_state.pagecontent))+'***')
-                    if endpage==len(st.session_state.pagecontent):
-                        st.markdown('***Begin of Document***')
+                
+                st.markdown(pdf_display, unsafe_allow_html=True)
+            if show :#or fulldocument:
+                # if fulldocument:
+                #     startpage=1
+                #     endpage=len(st.session_state.pagecontent)
+                col91, col92 = st.columns([1,1])
+                with col91:
+                    st.markdown(pdf_display, unsafe_allow_html=True)
+                with col92:
+                    for i in range(startpage,endpage):
+                        if i==1:
+                            st.markdown('***Begin of Document***')
+                        st.markdown(ftfy.fix_encoding(st.session_state.pagecontent[str(i)]))
+                        st.markdown('***Page '+str(i)+' of '+str(len(st.session_state.pagecontent))+'***')
+                        if i==len(st.session_state.pagecontent)-1:
+                            st.markdown('***End of Document***')
+                    if startpage==endpage:
+                        if startpage==1:
+                            st.markdown('***Begin of Document***')
+                        st.markdown(ftfy.fix_encoding(st.session_state.pagecontent[str(startpage)]))
+                        st.markdown('***Page '+str(startpage)+' of '+str(len(st.session_state.pagecontent))+'***')
+                        if endpage==len(st.session_state.pagecontent):
+                            st.markdown('***End of Document***')
 
                     
         # #Tab 2: Context Queries
@@ -291,7 +302,7 @@ if st.session_state.vector_index_name != None:
                 # t number input widget
                 st.session_state.t = st.number_input('Temperature', min_value=0.0, max_value=1.0, value=0.0)
             with col84:
-                st.session_state.k=st.number_input('k',value=1,min_value=1, max_value=20,)
+                st.session_state.k=st.number_input('k',value=3,min_value=1, max_value=20,)
             
             #q = st.text_input('Ask a question about the content of your file: '+st.session_state.document_name,key="questionwidget")
             # user's question text input widget
@@ -321,7 +332,7 @@ if st.session_state.vector_index_name != None:
                     if cancellation_details.reason == speechsdk.CancellationReason.Error:
                         st.warning("Error details: {}".format(cancellation_details.error_details))
                         
-            if add_question_button:
+            if add_question_button and new_question_name != "":
                 add_question(new_question_name)      
                 st.session_state.question = new_question_name
                 askquestion()
@@ -341,13 +352,10 @@ if st.session_state.vector_index_name != None:
                 askquestion()
                 
             if 'answer' in st.session_state:
-                st.header('Question: ')
-                st.markdown(st.session_state.question)
-                # text area widget for the LLM answer
-                #st.text_area('Azure OpenAI Answer: ', value=answer,height=200)
+                
                 st.header('Azure OpenAI Answer: ')
                 with st.container():
-                    st.markdown(st.session_state.answer)
+                    st.info(st.session_state.answer)
                     sourcetext="Source: "+st.session_state.vector_index_name+" - Pages:"+str(",".join(str(x) for x in st.session_state.sourcepages))
                 if enable_tts:
                     synthesize_text(st.session_state.answer)
@@ -355,9 +363,15 @@ if st.session_state.vector_index_name != None:
 
                 if 'context' in st.session_state:
                     with st.expander("Query Results",expanded=False):
-                        for i,content in enumerate(st.session_state.querycontent):
-                            st.header('Result from page '+st.session_state.querypages[i]+" with score "+str(st.session_state.queryscores[i])+":")
-                            st.markdown(content)
+                        tabs = st.tabs(
+                            ["Source " + str(i + 1) + "  " for i in range(len(st.session_state.querycontent))]
+                        )
+                        for i, tab in enumerate(tabs):
+                            with tab:
+                                st.header('Result from page '+st.session_state.querypages[i]+" with score "+str(st.session_state.queryscores[i])+":")
+                                st.markdown(st.session_state.querycontent[i])
+                        # for i, content in enumerate(st.session_state.querycontent):
+                            
                     
 
 
