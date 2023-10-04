@@ -48,7 +48,7 @@ https://conda.io/en/latest/miniconda.html
 In your explorer navigate to the analyzer directory and rightclick
 select open with conda prompt and in the prompt enter:
 
-    conda create --name document_analyzer python=3.11
+    conda create --name document_analyzer python=3.10.9
 
 ### Install the required packages:
 In your explorer navigate to the analyzer directory and rightclick and open a command prompt terminal
