@@ -191,10 +191,11 @@ def askquestion():
     st.session_state.querypages=querypages
     if 'vs' in st.session_state: # if there's the vector store (user uploaded, split and embedded a file)
         #replace â‚¬ with € in the answer
-        st.session_state.answer=ftfy.fix_encoding(askwithcontext(st.session_state.question))
+        answer=ftfy.fix_encoding(askwithcontext(st.session_state.question))
+        return answer
     else:
         st.error('Please select a Document first')
-
+    
 
 def gettokens(text):
     import tiktoken

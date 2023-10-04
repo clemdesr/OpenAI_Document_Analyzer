@@ -331,11 +331,12 @@ if st.session_state.vector_index_name != None:
                     st.warning("Speech Recognition canceled: {}".format(cancellation_details.reason))
                     if cancellation_details.reason == speechsdk.CancellationReason.Error:
                         st.warning("Error details: {}".format(cancellation_details.error_details))
-                        
+
+            answer = None            
             if add_question_button and new_question_name != "":
                 add_question(new_question_name)      
                 st.session_state.question = new_question_name
-                askquestion()
+                answer = askquestion()
 
             st.text("List of stored questions:")
 
@@ -349,16 +350,16 @@ if st.session_state.vector_index_name != None:
                 with col192:
                     del_question = st.button('Delete',on_click=delete_question,key="delquestion")
             if run_question or stt2:
-                askquestion()
+                answer = askquestion()
                 
-            if 'answer' in st.session_state:
+            if answer != None:
                 
                 st.header('Azure OpenAI Answer: ')
                 with st.container():
-                    st.info(st.session_state.answer)
+                    st.info(answer)
                     sourcetext="Source: "+st.session_state.vector_index_name+" - Pages:"+str(",".join(str(x) for x in st.session_state.sourcepages))
                 if enable_tts:
-                    synthesize_text(st.session_state.answer)
+                    synthesize_text(answer)
                 st.divider()
 
                 if 'context' in st.session_state:
